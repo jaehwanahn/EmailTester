@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Mail;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,14 +20,9 @@ namespace EmailTester
     {
         static void Main(string[] args)
         {
+            //ComponentInfo.SetLicense("FREE-LIMITED-KEY");
             Program p = new Program();
             p.GenerateReport();
-        }
-
-        private string GetDomain(string emailAddress)
-        {
-            MailAddress address = new MailAddress(emailAddress);
-            return address.Host;
         }
 
         // The email addresses in CSV file are seperated by next line.
@@ -47,6 +41,20 @@ namespace EmailTester
             return emailAddresses;
         }
 
+        private string GetDomain(string emailAddress)
+        {
+            System.Net.Mail.MailAddress address = null;
+            try
+            {
+                address = new System.Net.Mail.MailAddress(emailAddress);
+            } catch (Exception e)
+            {
+                return "";
+            }
+            
+            return address.Host;
+        }
+
         //https://stackoverflow.com/questions/2669841/how-to-get-mx-records-for-a-dns-name-with-system-net-dns
         private string GetDNS(string targetDomain)
         {
@@ -55,7 +63,7 @@ namespace EmailTester
 
             List<string> mxRecords = new List<string>();
 
-            if (!string.IsNullOrEmpty(records.ToString()))
+            if (records.Count != 0)
             {
                 foreach (var record in records)
                 {
@@ -75,42 +83,57 @@ namespace EmailTester
         private string TestEmail (string mxRecord, string targetEmail)
         {
             string response = "";
-            TcpClient tClient = new TcpClient(mxRecord, 25);
-            string CRLF = "\r\n";
-            byte[] dataBuffer;
-            string ResponseString;
-            NetworkStream netStream = tClient.GetStream();
-            StreamReader reader = new StreamReader(netStream);
-            ResponseString = reader.ReadLine();
-            /* Perform HELO to SMTP Server and get Response */
-            dataBuffer = BytesFromString("EHLO Hi" + CRLF);
-            netStream.Write(dataBuffer, 0, dataBuffer.Length);
-            ResponseString = reader.ReadLine();
-            dataBuffer = BytesFromString("MAIL FROM:<test@test.com>" + CRLF);
-            netStream.Write(dataBuffer, 0, dataBuffer.Length);
-            ResponseString = reader.ReadLine();
-            /* Read Response of the RCPT TO Message to know from mail server if it exist or not */
-            string rcpt = targetEmail;
-            dataBuffer = BytesFromString("RCPT TO:<" + rcpt + ">" + CRLF);
-            netStream.Write(dataBuffer, 0, dataBuffer.Length);
-            ResponseString = reader.ReadLine();
-            if (GetResponseCode(ResponseString) != 250)
+            try
             {
-                response = "The Address Does not Exist";
-                //Console.WriteLine(ResponseString);
-                //Console.WriteLine("The Address Does not Exist !");
-                //Console.WriteLine("Original Error from Smtp Server : " + ResponseString);
+                TcpClient tClient = new TcpClient(mxRecord, 25);
+                string CRLF = "\r\n";
+                byte[] dataBuffer;
+                string ResponseString;
+                NetworkStream netStream = tClient.GetStream();
+                StreamReader reader = new StreamReader(netStream);
+                ResponseString = reader.ReadLine();
+                /* Perform HELO to SMTP Server and get Response */
+                dataBuffer = BytesFromString("HELO Hi" + CRLF);
+                netStream.Write(dataBuffer, 0, dataBuffer.Length);
+
+                ResponseString = reader.ReadLine();
+
+                dataBuffer = BytesFromString("MAIL FROM:<jahn@wynfordgroup.com>" + CRLF);
+                netStream.Write(dataBuffer, 0, dataBuffer.Length);
+                ResponseString = reader.ReadLine();
+                /* Read Response of the RCPT TO Message to know from mail server if it exist or not */
+                string rcpt = targetEmail;
+                dataBuffer = BytesFromString("RCPT TO:<" + rcpt + ">" + CRLF);
+                netStream.Write(dataBuffer, 0, dataBuffer.Length);
+                ResponseString = reader.ReadLine();
+                Console.WriteLine("Working on: " + targetEmail);
+                if (GetResponseCode(ResponseString) != 250)
+                {
+                    response = "The Address Does not Exist";
+                    //Console.WriteLine(ResponseString);
+                    Console.WriteLine("The Address Does not Exist !");
+                    //Console.WriteLine("Original Error from Smtp Server : " + ResponseString);
+                }
+                else
+                {
+                    response = "The Address Exists";
+                    //Console.WriteLine(ResponseString);
+                    Console.WriteLine("The Address Exists!");
+                }
+                Console.WriteLine("------------------------------------");
+                /* QUITE CONNECTION */
+                dataBuffer = BytesFromString("QUITE" + CRLF);
+                netStream.Write(dataBuffer, 0, dataBuffer.Length);
+                tClient.Close();
             }
-            else
+            catch (SocketException se)
             {
-                response = "The Address Exists";
-                //Console.WriteLine(ResponseString);
-                //Console.WriteLine("The Address Exists!");
+                return "Time out";
             }
-            /* QUITE CONNECTION */
-            dataBuffer = BytesFromString("QUITE" + CRLF);
-            netStream.Write(dataBuffer, 0, dataBuffer.Length);
-            tClient.Close();
+            catch (IOException ioe)
+            {
+                return "Connection closed by host";
+            }
             return response;
         }
 
@@ -135,6 +158,8 @@ namespace EmailTester
             for (int i = 0; i < emails.Count; i++)
             {
                 targetDomain = GetDomain(emails[i]);
+                if (string.IsNullOrEmpty(targetDomain))
+                    continue;
                 mxRecord = GetDNS(targetDomain);
                 if (string.IsNullOrEmpty(mxRecord))
                     continue;
@@ -172,7 +197,7 @@ namespace EmailTester
             }
 
             // Need to specify full path.
-            xlWorkBook.SaveAs(@"D:\C#_Projects\EmailTester\testresult.xls", XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue);
+            xlWorkBook.SaveAs("testresult.xls", XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue);
             xlWorkBook.Close(true, misValue, misValue);
             xlApp.Quit();
         }
