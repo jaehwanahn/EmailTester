@@ -12,7 +12,7 @@ An application tha tests email addresses to see if they actually exists.
 
 This is not to test email address syntax.
 This application finds out a mx record of given email address and send SMTP commands including 'rcpt to:'.
-Based on the response after issuing 'rcpt to:' command, it determines whether an address is valid or not.
+Based on the response after issuing 'rcpt to:' command to corresponding exchange server, it determines whether an address is valid or not.
 
 ### Caveat
 
